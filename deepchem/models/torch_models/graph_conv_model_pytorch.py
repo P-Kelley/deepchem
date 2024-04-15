@@ -8,6 +8,13 @@ from deepchem.metrics import to_one_hot
 from deepchem.models.losses import L2Loss, SoftmaxCrossEntropy, Loss
 from typing import List, Union, Tuple, Iterable, Dict, Optional
 from deepchem.utils.typing import OneOrMany, LossFn, ActivationFn
+from torch.nn import Linear, ReLU, Dropout, Softmax
+from torch.nn.functional import batch_norm
+from deepchem.models.torch_models import layers
+
+
+#Temp layers import for testing
+
 
 #Imports to replace 
 #from deepchem.models import KerasModel, layers
@@ -61,28 +68,30 @@ class _GraphConvTorchModel(torch.nn.Module):
             layers.GraphConv(layer_size, activation_fn=torch.nn.relu)
             for layer_size in graph_conv_layers
         ]
+
+        #CONVERSION NOTE: REMOVE THIS NOTE LATER. batch_norm in pytorch has some different defaults then tensorflow documentation says batch norm has for tf. Check this later if models don't align
         self.batch_norms = [
-            BatchNormalization(fused=False) if batch_normalize else None
+            batch_norm() if batch_normalize else None
             for _ in range(len(graph_conv_layers) + 1)
         ]
         self.dropouts = [
-            Dropout(rate=rate) if rate > 0.0 else None for rate in dropout
+            Dropout(rate) if rate > 0.0 else None for rate in dropout
         ]
         self.graph_pools = [layers.GraphPool() for _ in graph_conv_layers]
-        self.dense = Dense(dense_layer_size, activation=tf.nn.relu)
+        self.dense = ReLU(Linear(dense_layer_size))
         self.graph_gather = layers.GraphGather(batch_size=batch_size,
                                                activation_fn=tf.nn.tanh)
         self.trim = TrimGraphOutput()
         if self.mode == 'classification':
-            self.reshape_dense = Dense(n_tasks * n_classes)
-            self.reshape = Reshape((n_tasks, n_classes))
+            self.reshape_dense = Linear(n_tasks * n_classes, n_tasks * n_classes)
+            self.reshape = torch.reshape((n_tasks, n_classes))
             self.softmax = Softmax()
         else:
-            self.regression_dense = Dense(n_tasks)
+            self.regression_dense = Linear(n_tasks, n_tasks)
             if self.uncertainty:
-                self.uncertainty_dense = Dense(n_tasks)
+                self.uncertainty_dense = Linear(n_tasks, n_tasks)
                 self.uncertainty_trim = TrimGraphOutput()
-                self.uncertainty_activation = Activation(torch.exp)
+                self.uncertainty_activation = torch.exp
 
     def call(self, inputs, training=False):
         atom_features = inputs[0]
