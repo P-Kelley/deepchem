@@ -5,11 +5,13 @@ on:
       - master
     paths:
       - "deepchem/**"
+      - "docs/**"
   pull_request: # ci work when creating a PR to master branch
     branches:
       - master
     paths:
       - "deepchem/**"
+      - "docs/**"
 jobs:
   docs-build:
     runs-on: ubuntu-latest
